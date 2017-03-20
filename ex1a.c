@@ -9,6 +9,7 @@
 void * doWork(void*);
 void * change_arr(int*);
 void * read_arr(int*);
+void clean_mem(void *);
 
 int main() {
 
@@ -27,15 +28,19 @@ int main() {
             exit(EXIT_FAILURE);
         }
     }
-
+    int * thread_answer = (int *) malloc(sizeof(int));
+    if (thread_answer == NULL){
+        perror("Allocating memory failed. main()");
+        exit(EXIT_FAILURE);
+    }
+    pthread_cleanup_push(clean_mem, thread_answer);
     for (int i = 0; i < THREADS_NUM; ++i) {
-        int * thread_answer = (int *) malloc(sizeof(int));
         pthread_join(thread_id[i],(void**) &thread_answer);
         //Here be thread answer int
         printf("thread %d says: %d\n", i+1,*(thread_answer));
     }
-
-    return 0;
+    pthread_exit(NULL);
+    pthread_cleanup_pop(0);
 }
 
 void * doWork(void* args){
@@ -59,4 +64,8 @@ void * read_arr(int * thread_ans){
 void * change_arr(int* nop){
     *(nop) = 1;
     pthread_exit((void*)nop);
+}
+
+void clean_mem(void * mem){
+    free(mem);
 }
