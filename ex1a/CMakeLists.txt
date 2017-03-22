@@ -7,3 +7,4 @@ set(SOURCE_FILES
         ex1a.c)
 
 add_executable(ex1a ${SOURCE_FILES})
+TARGET_LINK_LIBRARIES(ex1a pthread)
