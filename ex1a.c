@@ -10,10 +10,16 @@
 #define ITERATE 1000
 #define RANGE 10
 
+typedef struct {
+    int add;
+    int remove;
+    int read;
+}thread_data_t;
+
 void * doWork(void*);               //Spilts work between threads
 void * change_arr(void);            //Thread A job
 bool insert_to_arr(int num);        //ADDS numbers to arr - Thread A
-bool del_from_arr(int num);         //DELETES numbers from arr - Thread A
+bool rmv_from_arr(int num);         //DELETES numbers from arr - Thread A
 void * count_arr (void);            //Thread B job
 
 
@@ -22,19 +28,15 @@ pthread_rwlock_t lock;
 /*----------------------------------------------------------------------------*/
 int main() {
 
-    int * thread_answer[THREADS_NUM];
-
+    thread_data_t * thread_answer[THREADS_NUM];
     memset(global_arr, 0, SIZE_ARR);
     if(pthread_rwlock_init(&lock,NULL) == -1){
         perror("Cannot create lock in main()");
         exit(EXIT_FAILURE);
     }
 
-
     pthread_t thread_id[THREADS_NUM];
     int thread_arr[THREADS_NUM];
-    //int * thread_answer;
-    //memset(thread_answer, 0, THREADS_NUM);
 
     for (int i = 0; i < THREADS_NUM; ++i) {
         thread_arr[i] = i;
@@ -53,7 +55,10 @@ int main() {
         pthread_join(thread_id[i],(void**) &(thread_answer[i]));
         //Here be thread answer int
         if (thread_answer[i] != NULL) {
-            printf("thread %d says: %d\n", i + 1, *thread_answer[i]);
+            if (thread_arr[i] < THREADS_NUM/2)
+                printf("thread %d added %d numbers and removed %d numbers\n", i + 1, thread_answer[i]->add, thread_answer[i]->remove);
+            else
+                printf("thread %d found %d of it's numbers in the array\n", i+1, thread_answer[i]->read);
         }
     }
     for (int j = 0; j < THREADS_NUM; ++j) {
@@ -69,11 +74,11 @@ int main() {
 void * doWork(void* args){
     int* thread_number = (int*)args;
     if (*(thread_number) < THREADS_NUM/2 && *(thread_number) >= 0){
-        printf("starting change_arr in doWork() thread %d\n",*thread_number);
+//        printf("starting change_arr in doWork() thread %d\n",*thread_number);
         change_arr();
     }
     else{
-        printf("starting count_arr in doWork() thread %d\n",*thread_number);
+//        printf("starting count_arr in doWork() thread %d\n",*thread_number);
         count_arr();
     }
     //Next line is unused
@@ -82,26 +87,26 @@ void * doWork(void* args){
 /*----------------------------------------------------------------------------*/
 void * change_arr(){    //Thread A does this
     srand((unsigned int)time(NULL));
-    int * counter = (int*) malloc (sizeof(int));
+    thread_data_t * counter = (thread_data_t*) malloc (sizeof(thread_data_t));
     if (counter == NULL){
         perror("cannot allocate memory in change_arr()");
         exit(EXIT_FAILURE); //should be soft exit - with cleanup
     }
     for (int i = 0; i < ITERATE; ++i) {
-        int minus = rand()%1 == 0 ? 1 : -1;
-        int rand_num = rand()%(RANGE+1)*minus;
+        int minus = rand()%2 == 0 ? 1 : -1;
+        int rand_num = (rand()%(RANGE+1))*minus;
+//        printf("TEST: rand_num=%d in change_arr()\n",rand_num);
         if (rand_num > 0) {
             if (insert_to_arr(rand_num)){
-                ++(*counter);
+                ++(counter->add);
             }
         }
         else if (rand_num < 0){
-            if (del_from_arr(-rand_num)){
-                ++(*counter);
+            if (rmv_from_arr(-rand_num)){
+                ++(counter->remove);
             }
 
         }
-        usleep(20);
     }
     pthread_exit(counter);
 }
@@ -129,7 +134,7 @@ bool insert_to_arr(int num){
     return false;
 }
 /*----------------------------------------------------------------------------*/
-bool del_from_arr(int num){
+bool rmv_from_arr(int num){
 
     for (int i = 0; i < SIZE_ARR; ++i) {
         pthread_rwlock_rdlock(&lock);
@@ -139,6 +144,7 @@ bool del_from_arr(int num){
             if (global_arr[i] == num){
                 global_arr[i] = 0;
                 pthread_rwlock_unlock(&lock);
+//                printf("removed %d from arr[%d]=%d\n", num, i, global_arr[i]);
                 return true;
             }
             else{
@@ -158,7 +164,7 @@ void * count_arr (){
 
     srand((unsigned) time(NULL));
     bool found;
-    int * counter = (int*) malloc (sizeof(int));
+    thread_data_t * counter = (thread_data_t*) malloc (sizeof(thread_data_t));
     if (counter == NULL){
         perror("cannot allocate memory in change_arr()");
         exit(EXIT_FAILURE); //should be soft exit - with cleanup
@@ -166,17 +172,17 @@ void * count_arr (){
 
     for (int i = 0; i < ITERATE; ++i) {
         found = false;
-        usleep(900);
+//        usleep(900);
         int rand_num = rand() % RANGE + 1;
         for (int j = 0; j < SIZE_ARR; ++j) {
             pthread_rwlock_rdlock(&lock);
             if (global_arr[j] == rand_num) {
-                printf("Found=%d in array[%d]=%d\n", rand_num, j, global_arr[j]);
+//                printf("Found=%d in array[%d]=%d\n", rand_num, j, global_arr[j]);
                 found = true;
             }
             pthread_rwlock_unlock(&lock);
             if (found) {
-                ++(*counter);
+                ++(counter->read);
                 break;
             }
         }
