@@ -128,68 +128,99 @@ void * assign_thread(void *args){
 }
 /*----------------------------------------------------------------------------*/
 /**
- * Updater
+ * Performs the first assignment: Generates a random prime, and tries to insert
+ * it into global array. If unsuccessful (when array is full), signals the cleaner
+ * threads to start working.
+ * Uses mutex lock to control writing into the array.
+ * @param thread_id the thread_id number used for printing information.
+ * @return NULL as ret_val in pthread_exit()
+ *
+ * Note the DEBUG macro. If DEBUG definition is uncommented the extra printf()
+ * will give useful information on thread operations.
  * */
 void * updater_thread(int thread_id){
-    int i;
-    for (i = 0; i < ITERATE ; ++i) {
+
+    for (int i = 0; i < ITERATE ; ++i) {
         pthread_mutex_lock(&mtx);           //Am I allowed to continue?
-        pthread_mutex_unlock(&mtx);         //Passed Checks
-        bool wasInserted = false;
+        pthread_mutex_unlock(&mtx);         //Currently no cleaner thread is working
+        bool wasInserted = false;           //To mark whether to call the cleaner_thread
         int rand_prime = generatePrime(RANGE);
 #ifdef DEBUG
         printf("Thread %d generated %d\n", thread_id,rand_prime);
 #endif
-        pthread_mutex_lock(&mtx);
-        if (data._counter < N){
+        pthread_mutex_lock(&mtx);           //acquire lock
+
+/*-------------------------- Critical Section --------------------------*/
+        if (data._counter < N){             //array is not full
+//Verbose information:
 #ifdef DEBUG
             printf("thread=%d says: rand_numer=%d, data_counter=%d\n",thread_id,rand_prime,data._counter);
             fflush(stdout);
 #endif
+            data._nums[data._counter] = rand_prime; //insert random prime to array
+            ++data._counter;                        //increase counter
+            pthread_mutex_unlock(&mtx);             //release the lock
+/*-------------------------- End Crit.Section---------------------------*/
 
-            data._nums[data._counter] = rand_prime;
-            ++data._counter;
-            pthread_mutex_unlock(&mtx);
-            wasInserted = true;
+            wasInserted = true;                     //mark insertion as success
         }
         else {
-            pthread_mutex_unlock(&mtx);
+            pthread_mutex_unlock(&mtx);             //array is full, only release lock
         }
+        //array is full:
         if (!wasInserted){
+//Verbose information:
 #ifdef DEBUG
             printf("Thread %d calls upon a cleaner thread\n",thread_id);
 #endif
-            pthread_cond_signal(&cv);
+            pthread_cond_signal(&cv);               //Notify all cleaners array is full
         }
     }
 //#ifdef DEBUG
-    printf("Thread %d finished running. Bye!\n", thread_id);
+    printf("Thread %d finished running. Bye!\n", thread_id); //Notify user Thread has finished
 //#endif
     pthread_exit(NULL);
 }
 /*----------------------------------------------------------------------------*/
+/**
+ * Performs the second assignment: Sleeps on the cond.var, and if awoken by
+ * updater_thread, acquires the lock and copies the global array, zeros out the
+ * counter and prints the (population) variance.
+ * @param thread_id the thread id number used to display information
+ * @return NULL as ret_val in pthread_exit()
+ * */
 void * cleaner_thread(int thread_id){
-    while (data._counter != STOP_VALUE){
-        int my_arr[N];
+    while (data._counter != STOP_VALUE){    //Predefined STOP_VALUE
+        int my_arr[N];                      //local copy of global array
         pthread_cond_wait(&cv, &mtx);       //Wait to be called
-        if (data._counter == STOP_VALUE){
-            pthread_mutex_unlock(&mtx);
-            pthread_cond_signal(&cv);
+
+        if (data._counter == STOP_VALUE){   //STOP_VALUE was issued during run
+            pthread_mutex_unlock(&mtx);     //release the lock acquired by cond_wait()
+            pthread_cond_signal(&cv);       //signal next thread waiting
             printf("Thread %d has finished.\n",thread_id);
-            pthread_exit(NULL);
+            pthread_exit(NULL);             //exit
         }
+        /*----- Critical Section ------*/
+        //Copy the global array
         for (int i = 0; i < N; ++i) {
             my_arr[i] = data._nums[i];
         }
+        //Zero the counter
         data._counter = 0;
         pthread_mutex_unlock(&mtx);
+        /*-------- End Section --------*/
 
-        double vrn = calcVariance(my_arr, N);
+        double vrn = calcVariance(my_arr, N);   //Calculate variance
         printf("Cleanup performed by thread %d. Calculated variance %.2lf\n",thread_id, vrn);
     }
     pthread_exit(NULL);
 }
 /*----------------------------------------------------------------------------*/
+/**
+ * Efficient prime checker
+ * @return true if @param num is a prime integer
+ *
+ * */
 bool isPrime(int num){
 
     if (num == 1){return false;}
@@ -206,10 +237,16 @@ bool isPrime(int num){
     return true;
 }
 /*----------------------------------------------------------------------------*/
+/**
+ * Calculates the (population) variance
+ * @return the variance based on the @param arr of integers and @param arr_len
+ * indicating the length of the array.
+ * */
 double calcVariance(int *arr, int arr_len){
     if (arr_len == 0){                 //Do Not Divide by 0!
         return 0;
     }
+    //Calculate the average
     double avg = 0, variance = 0;
     int i = 0;
 
@@ -218,13 +255,20 @@ double calcVariance(int *arr, int arr_len){
     }
     avg /=arr_len;
 
-    //Calc (sum for all 0<=i<sizeArray (Xi-avg)^2) /sizeOfArray;
+    //Calc (sum for all 0<=i<sizeArray (Xi-Xavg)^2) /sizeOfArray;
     for (i=0; i<arr_len; i++){
         variance = variance + pow((arr[i]-avg),2);
     }
     return variance/(double)arr_len;
 }
 /*----------------------------------------------------------------------------*/
+/**
+ * Prime generator
+ * Based on @param range to limit the size of the prime generated p to be
+ * p < (@param range).
+ * Using a random integer generator and usleep() to roll a random number,
+ * check if it is a prime and @return a random prime number
+ * */
 int generatePrime(int range){
 
     srand((unsigned)time(NULL));
