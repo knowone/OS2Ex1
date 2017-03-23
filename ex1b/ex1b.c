@@ -12,7 +12,7 @@
 #define ITERATE 100
 #define RANGE 100
 #define STOP_VALUE -1
-#define SLEEP_DELAY 2000
+#define SLEEP_DELAY 200
 #define SLEEP SLEEP1
 #define SLEEP1 usleep(SLEEP_DELAY);
 #define SLEEP2 usleep(0);
@@ -115,7 +115,7 @@ void * updater_thread(int thread_id){
         }
     }
 //#ifdef DEBUG
-    printf("\nThread %d finished running. Bye!\n\n", thread_id);
+    printf("Thread %d finished running. Bye!\n", thread_id);
 //#endif
     pthread_exit(NULL);
 }
