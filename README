@@ -1,0 +1,39 @@
+================================================================================================
+File: ex1a
+Reader/Writer threads
+ ==============
+ Written by: Omer Schwartz
+             email: know.one(2).omer at gmail d.o.t com [remove numerals and brackets]
+
+ 			 
+		The program reads and writes using threads to a single array, managing it with 
+		read/write locks.
+		The writers try to add or remove numbers from the array and the readers try to find numbers
+		in the array
+     
+     
+ Compile: gcc -Wall -pthread ex1a.c -lm -o ex1a
+ Run: ./ex1a
+ 	 
+ Output: The program will print to standard out the results of the thread reading and writing.
+ 
+================================================================================================
+File: ex1b.c
+ Fill an array in parallel
+ ==============
+ Written by: Omer Schwartz
+            email: know.one(2).omer at gmail d.o.t com [remove numerals and brackets]
+ 			 
+ 			 
+     	The program fills an array of primes simulteniously and when it is full, prints out the
+     		variance of the full array, and starts to fill it again.
+     
+     
+ Compile: gcc -Wall -pthread ex1b.c -lm -o ex1b
+ Run: ./ex1b
+	    
+
+ Output: The program will print to standard out the variances calculated by the program when
+ 			the the array is full of primes
+ 			
+================================================================================================
