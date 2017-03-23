@@ -36,8 +36,8 @@
                                     //The bigger the number, the slower the program
                                     //Recommended value - 200000 (minimum 1 - no sleep)
 
-/*#define DEBUG                     /*Uncomment this to see verbose(extended) data about
-/*                                    the program running and threads work*/
+/*#define DEBUG                     //Uncomment this to see verbose(extended) data about
+                                    //the program running and threads work*/
 /*------------------------ Type Definition -----------------------------------*/
 
 typedef struct{
