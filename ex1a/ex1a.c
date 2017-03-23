@@ -2,7 +2,7 @@
  * Created by @author Omer Schwartz
  * know.one.omer at gmail d.o.t com
  *
- *
+ * Program 
  *
  * */
 
@@ -12,17 +12,18 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdbool.h>
-
+/*-------------------------- Define Section ----------------------------------*/
 #define SIZE_ARR 100
 #define THREADS_NUM 6
 #define ITERATE 1000
 #define RANGE 10
-
+/*------------------------ Type Definition -----------------------------------*/
 typedef struct {
     int added;
     int removed;
     int read;
 }thread_data_t;
+/*------------------------ Func Declaration ----------------------------------*/
 
 void * doWork(void*);               //Spilts work between threads
 void * change_arr(void);            //Thread A job
@@ -30,10 +31,10 @@ bool insert_to_arr(int num);        //ADDS numbers to arr - Thread A
 bool rmv_from_arr(int num);         //DELETES numbers from arr - Thread A
 void * count_arr (void);            //Thread B job
 
-
+/*------------------------ Global Variables ----------------------------------*/
 int global_arr[SIZE_ARR];           //Shared array by al threads
 pthread_rwlock_t lock;              //global rw_lock
-/*----------------------------------------------------------------------------*/
+/*------------------------ Main implementation -------------------------------*/
 int main() {
     int status;
     memset(global_arr, 0, SIZE_ARR);                //Zero out the global arr
@@ -59,7 +60,8 @@ int main() {
     }
 
     for (int i = 0; i < THREADS_NUM; ++i) {         //Wait for 6 threads, print the output
-        status = pthread_join(thread_id[i],(void**) &(thread_answer[i]));    //thread_answer[i] is allocated from thread
+        status = pthread_join(thread_id[i],(void**) &(thread_answer[i]));
+        //thread_answer[i] is allocated from thread
         if (status!=0){
             fputs("Error with pthread_join in main()",stderr);
             exit(EXIT_FAILURE);
@@ -69,14 +71,19 @@ int main() {
         if (thread_answer[i] != NULL) {
             //Print output by thread assignment
             if (thread_arr[i] < THREADS_NUM/2) {
-                printf("thread %d with id=(%ld) added %d numbers and removed %d numbers\n", i + 1, thread_id[i],
+                printf("thread %d with id=(%ld) added %d numbers and removed %d numbers\n",
+                       i + 1,
+                       thread_id[i],
                        thread_answer[i]->added, thread_answer[i]->removed);
             }
             else{
-                printf("thread %d with id=(%ld) found %d of its numbers in the array\n", i+1,thread_id[i],
+                printf("thread %d with id=(%ld) found %d of its numbers in the array\n",
+                       i+1,
+                       thread_id[i],
                        thread_answer[i]->read);
             }
-        }//endif, skip if no answer is returned from thread. Error handling should be here
+        }//endif, skip if no answer is returned from thread.
+        // Error handling should be here
     }
 
     //Free allocated space before main() exits
