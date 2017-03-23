@@ -22,8 +22,8 @@ bool rmv_from_arr(int num);         //DELETES numbers from arr - Thread A
 void * count_arr (void);            //Thread B job
 
 
-int global_arr[SIZE_ARR];
-pthread_rwlock_t lock;
+int global_arr[SIZE_ARR];           //Shared array by al threads
+pthread_rwlock_t lock;              //global rw_lock
 /*----------------------------------------------------------------------------*/
 int main() {
 
@@ -49,11 +49,11 @@ int main() {
         }
     }
 
-
-    for (int i = 0; i < THREADS_NUM; ++i) {
-        pthread_join(thread_id[i],(void**) &(thread_answer[i]));
-        //Here be thread answer int
+    for (int i = 0; i < THREADS_NUM; ++i) {         //Wait for 6 threads, print the output
+        pthread_join(thread_id[i],(void**) &(thread_answer[i]));    //thread_answer[i] is allocated from thread
+        //Check answer exists
         if (thread_answer[i] != NULL) {
+            //Print output by thread assignment
             if (thread_arr[i] < THREADS_NUM/2) {
                 printf("thread %d with id=(%ld) added %d numbers and removed %d numbers\n", i + 1, thread_id[i],
                        thread_answer[i]->added, thread_answer[i]->removed);
@@ -62,26 +62,27 @@ int main() {
                 printf("thread %d with id=(%ld) found %d of its numbers in the array\n", i+1,thread_id[i],
                        thread_answer[i]->read);
             }
-        }
+        }//endif, skip if no answer is returned from thread. Error handling should be here
     }
+
+    //Free allocated space before main() exits
     for (int j = 0; j < THREADS_NUM; ++j) {
         if (thread_answer[j] != NULL) {
             free(thread_answer[j]);
         }
     }
-    pthread_rwlock_destroy(&lock);
-    pthread_exit(NULL);
+
+    pthread_rwlock_destroy(&lock);  //Release lock
+    exit(EXIT_SUCCESS);            //Can also use pthread_exit()
 
 }
 /*----------------------------------------------------------------------------*/
 void * doWork(void* args){
     int* thread_number = (int*)args;
     if (*(thread_number) < THREADS_NUM/2 && *(thread_number) >= 0){
-//        printf("starting change_arr in doWork() thread %d\n",*thread_number);
         change_arr();
     }
     else{
-//        printf("starting count_arr in doWork() thread %d\n",*thread_number);
         count_arr();
     }
     //Next line is unused
