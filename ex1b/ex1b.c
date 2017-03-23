@@ -1,69 +1,119 @@
+/**
+ * Created by @author Omer Schwartz
+ * know.one.omer at gmail d.o.t com
+ *
+ * Program creates 6 threads, 3 producer threads that fill a global array with
+ * random prime numbers, and 3 consumer threads waiting in pool, being called
+ * by the producer threads to clean the full array and print the variance of
+ * the full array.
+ *
+ * Only one consumer is allowed to run, and only 1 producer is allowed writing
+ * in the global array, and that is controlled by using a POSIX mutex and
+ * conditional variable.
+ *
+ * Program will output to stdout the variance of the current array when a
+ * consumer was called upon.
+ *
+ * */
+
 /*----------------------------------------------------------------------------*/
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
-#include <string.h>
 #include <math.h>
 #include <unistd.h>
 /*----------------------------------------------------------------------------*/
-#define N 10
-#define THREADS_NUM 6
-#define ITERATE 100
-#define RANGE 100
-#define STOP_VALUE -1
-#define SLEEP_DELAY 200
-#define SLEEP SLEEP1
-#define SLEEP1 usleep(SLEEP_DELAY);
-#define SLEEP2 usleep(0);
-//#define DEBUG
-/*----------------------------------------------------------------------------*/
+#define N 10                        //As defined in exercise
+#define THREADS_NUM 6               //Amount of threads, half will be
+                                    //producers and half consumers
+#define ITERATE 100                 //Thread's loop iteration
+#define RANGE 100                   //Range of prime numbers
+#define STOP_VALUE -1               //Cleanup threads stop marker for counter
+#define SLEEP usleep(SLEEP_DELAY);  //Used to generate random primes
+
+#define SLEEP_DELAY 400             //Used to generate different prime numbers
+                                    //The bigger the number, the slower the program
+                                    //Recommended value - 400-600
+
+/*#define DEBUG                     /*Uncomment this to see verbose(extended) data about
+/*                                    the program running and threads work*/
+/*------------------------ Type Definition -----------------------------------*/
+
 typedef struct{
     int _nums[N];
     int _counter;
 }Data;
-/*----------------------------------------------------------------------------*/
-Data data;
+/*------------------------ Global Variables -----------------------------------*/
 
-pthread_mutex_t mtx = PTHREAD_MUTEX_INITIALIZER;
-pthread_cond_t cv = PTHREAD_COND_INITIALIZER;
-/*----------------------------------------------------------------------------*/
+Data data;                                          //For Thread operations
+
+pthread_mutex_t mtx = PTHREAD_MUTEX_INITIALIZER;    //Mutex lock
+pthread_cond_t cv = PTHREAD_COND_INITIALIZER;       //cond.var for thread sleep
+/*------------------------ Func Declaration -----------------------------------*/
+
 void * assign_thread(void *);
 void * updater_thread(int);
 void * cleaner_thread(int);
 bool isPrime(int);
 double calcVariance(int *arr, int arr_len);
 int generatePrime(int);
-
-/*----------------------------------------------------------------------------*/
+/*------------------------ Main implementation --------------------------------*/
+/**
+ * Main creates all the threads with their assignment number as param for the
+ * thread function.
+ * After pthread_joining for the first 3 threads (the producer threads) it
+ * signals the consumer threads to terminate (with data.counter=STOP_VALUE)
+ * and destroys locks and exits.
+ * */
 int main() {
     int status;
     pthread_t thread_id[THREADS_NUM];               //required for thread creating
 
-    int thread_assign[THREADS_NUM];                    //needed for thread job assignment
-    memset(data._nums, 0, N);
+    int thread_assign[THREADS_NUM];                 //needed for thread job assignment
+    data._counter = 0;                              //Reset data.counter
+    //(already zeroed; better safe then sorry)
     for (int i = 0; i < THREADS_NUM; ++i) {
-        thread_assign[i] = i;
+        thread_assign[i] = i;                       //assign each thread a role
+        //Create each thread
         status = pthread_create(&thread_id[i], NULL, assign_thread, &thread_assign[i]);
         if (status != 0) {
             fputs("error creating threads in main()", stderr);
             exit(EXIT_FAILURE);
         }
     }
-    //pthread_cleanup_push(close_garbage_threads, NULL);
+    //Wait for producer threads
     for (int j = 0; j < THREADS_NUM / 2; ++j) {
+
         status = pthread_join(thread_id[j], NULL);
         if (status != 0) {
             fputs("Error joining threads in main()", stderr);
             exit(EXIT_FAILURE);
         }
     }
-    data._counter = STOP_VALUE;
-    pthread_cond_signal(&cv);
 
-    pthread_exit(NULL);
+    data._counter = STOP_VALUE;                     //Send STOP signal to consumer threads
+    pthread_cond_signal(&cv);                       //Wake consumer threads from sleep
+    //Wait for threads to finished exiting
+    for (int k = THREADS_NUM/2; k < THREADS_NUM ; ++k) {
+        status = pthread_join(thread_id[k], NULL);
+        if (status != 0) {
+            fputs("Error joining threads in main()", stderr);
+            exit(EXIT_FAILURE);
+        }
+    }
+    //Release mutex and cond.var
+    pthread_mutex_destroy(&mtx);
+    pthread_cond_destroy(&cv);
+    exit(EXIT_SUCCESS);
 }
-/*----------------------------------------------------------------------------*/
+/*------------------------ Function implementation ----------------------------*/
+/**
+ * Function to assign a thread a job - updater_thread (producer thread)
+ *                                   - cleaner_thread (consumer thread)
+ * @param args pointer to function arguments. Should contain the thread number(id)
+ * @return function returns NULL as ret_value in pthread_exit()
+ * */
 void * assign_thread(void *args){
 
     int thread_id = *(int*)args;
@@ -77,6 +127,9 @@ void * assign_thread(void *args){
     pthread_exit(NULL);
 }
 /*----------------------------------------------------------------------------*/
+/**
+ * Updater
+ * */
 void * updater_thread(int thread_id){
     int i;
     for (i = 0; i < ITERATE ; ++i) {
@@ -96,22 +149,17 @@ void * updater_thread(int thread_id){
 
             data._nums[data._counter] = rand_prime;
             ++data._counter;
-//            printf("releasing lock\n");
             pthread_mutex_unlock(&mtx);
             wasInserted = true;
         }
         else {
             pthread_mutex_unlock(&mtx);
         }
-
-
-
         if (!wasInserted){
 #ifdef DEBUG
             printf("Thread %d calls upon a cleaner thread\n",thread_id);
 #endif
             pthread_cond_signal(&cv);
-
         }
     }
 //#ifdef DEBUG
