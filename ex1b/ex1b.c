@@ -30,11 +30,11 @@
 #define ITERATE 100                 //Thread's loop iteration
 #define RANGE 100                   //Range of prime numbers
 #define STOP_VALUE -1               //Cleanup threads stop marker for counter
-#define SLEEP usleep(SLEEP_DELAY);  //Used to generate random primes
 
-#define SLEEP_DELAY 400             //Used to generate different prime numbers
+#define SLEEP usleep((unsigned)rand()%SLEEP_DELAY);
+#define SLEEP_DELAY 200000          //Used to generate different prime numbers (in milliseconds)
                                     //The bigger the number, the slower the program
-                                    //Recommended value - 400-600
+                                    //Recommended value - 200000 (minimum 1 - no sleep)
 
 /*#define DEBUG                     /*Uncomment this to see verbose(extended) data about
 /*                                    the program running and threads work*/
@@ -69,7 +69,7 @@ int generatePrime(int);
 int main() {
     int status;
     pthread_t thread_id[THREADS_NUM];               //required for thread creating
-
+    srand((unsigned)time(NULL));
     int thread_assign[THREADS_NUM];                 //needed for thread job assignment
     data._counter = 0;                              //Reset data.counter
     //(already zeroed; better safe then sorry)
@@ -144,6 +144,8 @@ void * updater_thread(int thread_id){
         pthread_mutex_lock(&mtx);           //Am I allowed to continue?
         pthread_mutex_unlock(&mtx);         //Currently no cleaner thread is working
         bool wasInserted = false;           //To mark whether to call the cleaner_thread
+
+        SLEEP;                              //Allows the random generator to get new random numbers
         int rand_prime = generatePrime(RANGE);
 #ifdef DEBUG
         printf("Thread %d generated %d\n", thread_id,rand_prime);
@@ -200,18 +202,24 @@ void * cleaner_thread(int thread_id){
             printf("Thread %d has finished.\n",thread_id);
             pthread_exit(NULL);             //exit
         }
-        /*----- Critical Section ------*/
-        //Copy the global array
-        for (int i = 0; i < N; ++i) {
-            my_arr[i] = data._nums[i];
+        //Action was already performed, release lock and wait again
+        if (data._counter == 0){
+            pthread_mutex_unlock(&mtx);
         }
-        //Zero the counter
-        data._counter = 0;
-        pthread_mutex_unlock(&mtx);
-        /*-------- End Section --------*/
+        else {
+            /*----- Critical Section ------*/
+            //Copy the global array
+            for (int i = 0; i < N; ++i) {
+                my_arr[i] = data._nums[i];
+            }
+            //Zero the counter
+            data._counter = 0;
+            pthread_mutex_unlock(&mtx);
+            /*-------- End Section --------*/
 
-        double vrn = calcVariance(my_arr, N);   //Calculate variance
-        printf("Cleanup performed by thread %d. Calculated variance %.2lf\n",thread_id, vrn);
+            double vrn = calcVariance(my_arr, N);   //Calculate variance
+            printf("Cleanup performed by thread %d. Calculated variance %.2lf\n", thread_id, vrn);
+        }
     }
     pthread_exit(NULL);
 }
@@ -271,14 +279,10 @@ double calcVariance(int *arr, int arr_len){
  * */
 int generatePrime(int range){
 
-    srand((unsigned)time(NULL));
-    int num = rand()%range;
-    SLEEP;
-    num *= rand()%range;
+                             //Sleep to pause between threads
+    int num =rand()&range;
     while (!isPrime(num)){
         num = rand()%range;
-        SLEEP;
-        num *= rand()%range;
     }
     return num;
 }
