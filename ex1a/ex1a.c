@@ -6,7 +6,7 @@
  *
  * */
 
-/*------------------------- Include Section --------------------------------*/
+/*-------------------------- Include Section ---------------------------------*/
 #include <pthread.h>
 #include <stdio.h>
 #include <string.h>
@@ -35,6 +35,20 @@ void * count_arr (void);            //Thread B job
 int global_arr[SIZE_ARR];           //Shared array by al threads
 pthread_rwlock_t lock;              //global rw_lock
 /*------------------------ Main implementation -------------------------------*/
+/**
+* The main thread in the program creates six secondary threads of two types:
+* a.	The first three threads randomly create a number between -10 to 10,
+* insert the number in an array if is a positive else do nothing,
+*  search the opposite number and empty the cell if is a negative.
+* Each thread counts how many he has added or removed finally
+*  he returns to the main thread and prints it.
+* b.	The last three threads, each thread creates 1000 times a random number
+* between 1 to 10.
+* Each thread returns how many values he found in an array.
+* Meanwhile the main thread is waiting for them to finish and at the end he
+* prints the information which was returned.
+*
+*/
 int main() {
     int status;
     memset(global_arr, 0, SIZE_ARR);                //Zero out the global arr
@@ -98,18 +112,24 @@ int main() {
 
 }
 /*----------------------------------------------------------------------------*/
+/**
+* doWork splits the work between the threads
+*/
 void * doWork(void* args){
-    int* thread_number = (int*)args;
+    int* thread_number = (int*)args;    //pointer to thread id
     if (*(thread_number) < THREADS_NUM/2 && *(thread_number) >= 0){
-        change_arr();
+        change_arr();                   //For Threads type A
     }
     else{
-        count_arr();
+        count_arr();                    //For threads type B
     }
     //Next line is unused
     pthread_exit(NULL);
 }
 /*----------------------------------------------------------------------------*/
+/**
+*
+*/
 void * change_arr(){    //Thread A does this
     srand((unsigned int)time(NULL));
     thread_data_t * counter = (thread_data_t*) malloc (sizeof(thread_data_t));
@@ -118,11 +138,11 @@ void * change_arr(){    //Thread A does this
         exit(EXIT_FAILURE); //should be soft exit - with cleanup
     }
     for (int i = 0; i < ITERATE; ++i) {
-        int minus = rand()%2 == 0 ? 1 : -1;
+        int minus = rand()%2 == 0 ? 1 : -1;     //decide if - or +
         int rand_num = (rand()%(RANGE+1))*minus;
         if (rand_num > 0) {
-            if (insert_to_arr(rand_num)){
-                ++(counter->added);
+            if (insert_to_arr(rand_num)){       //call C.S part
+                ++(counter->added);             //count results
             }
         }
         else if (rand_num < 0){
@@ -138,6 +158,7 @@ void * change_arr(){    //Thread A does this
 bool insert_to_arr(int num){
     int status;
     for (int i = 0; i < SIZE_ARR; ++i) {
+        /*Critical Section:*/
         status = pthread_rwlock_rdlock(&lock);
         if (status!=0){
             fputs("Error with acquire read_lock in insert_to_arr()",stderr);
@@ -145,10 +166,13 @@ bool insert_to_arr(int num){
         }
         if (global_arr[i] == 0){
             pthread_rwlock_unlock(&lock);
+            /*Critical Section ends*/
             pthread_rwlock_wrlock(&lock);
+            /*Critical Section:*/
             if (global_arr[i] == 0){
                 global_arr[i] = num;
                 pthread_rwlock_unlock(&lock);
+                /*Critical Section ends*/
                 return true;
             }
             else{
@@ -167,15 +191,23 @@ bool rmv_from_arr(int num){
     int status;
     for (int i = 0; i < SIZE_ARR; ++i) {
         status = pthread_rwlock_rdlock(&lock);
+
+        /*Critical Section:*/
         if (status!=0){
             fputs("Error with acquire read_lock in rmv_from_arr()",stderr);
             pthread_exit(NULL);
         }        if (global_arr[i] == num){
             pthread_rwlock_unlock(&lock);
+            /*Critical Section ends*/
+
             pthread_rwlock_wrlock(&lock);
+
+            /*Critical Section:*/
             if (global_arr[i] == num){
                 global_arr[i] = 0;
                 pthread_rwlock_unlock(&lock);
+                /*Critical Section ends*/
+
                 return true;
             }
             else{
@@ -210,10 +242,14 @@ void * count_arr (){
                 fputs("Error with acquire read_lock in count_arr()",stderr);
                 pthread_exit(NULL);
             }
+            /*Critical Section:*/
+
             if (global_arr[j] == rand_num) {
                 found = true;
             }
             pthread_rwlock_unlock(&lock);
+            /*Critical Section ends*/
+
             if (found) {
                 ++(counter->read);
                 break;
