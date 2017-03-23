@@ -2,8 +2,12 @@
  * Created by @author Omer Schwartz
  * know.one.omer at gmail d.o.t com
  *
- * Program 
- *
+ * Program reads and writes using threads to a single array, managing it with
+ *		read/write locks.
+ *	The writers try to add or remove numbers from the array and the readers
+ *     try to find numbers in the array
+ * The program will print to standard out the results of the thread
+ * reading and writing.
  * */
 
 /*-------------------------- Include Section ---------------------------------*/
@@ -114,6 +118,8 @@ int main() {
 /*----------------------------------------------------------------------------*/
 /**
 * doWork splits the work between the threads
+ * @param args contains the thread number (id) for its assignment
+ * @return NULL to pthread_exit()
 */
 void * doWork(void* args){
     int* thread_number = (int*)args;    //pointer to thread id
@@ -128,15 +134,22 @@ void * doWork(void* args){
 }
 /*----------------------------------------------------------------------------*/
 /**
-*
+* Threads type A perform insertion or removal of value from array
+ * Also, they count how many operations where performed by the threads
+ * @return counter pointer to allocated memory containing the counter of how
+ *  many threads operations completed successfully
 */
 void * change_arr(){    //Thread A does this
+
     srand((unsigned int)time(NULL));
+
+    //Allocate memory for counter
     thread_data_t * counter = (thread_data_t*) malloc (sizeof(thread_data_t));
     if (counter == NULL){
         fputs("cannot allocate memory in change_arr()", stderr);
         exit(EXIT_FAILURE); //should be soft exit - with cleanup
     }
+
     for (int i = 0; i < ITERATE; ++i) {
         int minus = rand()%2 == 0 ? 1 : -1;     //decide if - or +
         int rand_num = (rand()%(RANGE+1))*minus;
@@ -146,47 +159,62 @@ void * change_arr(){    //Thread A does this
             }
         }
         else if (rand_num < 0){
-            if (rmv_from_arr(-rand_num)){
+            if (rmv_from_arr(-rand_num)){       //Use the opposite of rand_num
                 ++(counter->removed);
             }
 
-        }
+        }//ignore case rand_num=0
     }
     pthread_exit(counter);
 }
 /*----------------------------------------------------------------------------*/
+/**
+ * Perform the insert operation on the array.
+ * insert @param num to global array by using wrlock
+ * @return true if successfully inserted a number to array
+ *          false if failed
+ * */
 bool insert_to_arr(int num){
     int status;
     for (int i = 0; i < SIZE_ARR; ++i) {
         /*Critical Section:*/
-        status = pthread_rwlock_rdlock(&lock);
+        status = pthread_rwlock_rdlock(&lock);      //get reader lock
         if (status!=0){
             fputs("Error with acquire read_lock in insert_to_arr()",stderr);
-            pthread_exit(NULL); //Should try again
+            pthread_exit(NULL);   //Should try again
         }
-        if (global_arr[i] == 0){
-            pthread_rwlock_unlock(&lock);
+
+        if (global_arr[i] == 0){                    //available space
+            pthread_rwlock_unlock(&lock);           //release reader lock
             /*Critical Section ends*/
-            pthread_rwlock_wrlock(&lock);
+            pthread_rwlock_wrlock(&lock);           //acquire writer lock
             /*Critical Section:*/
-            if (global_arr[i] == 0){
-                global_arr[i] = num;
-                pthread_rwlock_unlock(&lock);
+            if (global_arr[i] == 0){                //verify empty cell in array
+                global_arr[i] = num;                //write number to array
+                pthread_rwlock_unlock(&lock);       //release lock
                 /*Critical Section ends*/
                 return true;
             }
             else{
-                pthread_rwlock_unlock(&lock);
+                pthread_rwlock_unlock(&lock);       //only release the lock
+                //if cell no longer empty
                 i = 0; //resets the loop
             }
         }
         else{
-            pthread_rwlock_unlock(&lock);
+            pthread_rwlock_unlock(&lock);           //release the rdlock
+            //if cell not empty
         }
     }
     return false;
 }
 /*----------------------------------------------------------------------------*/
+/**
+ *  Perform the removal operation on the array.
+ * Deletes @param num from global array by using wrlock
+ * @return true if successfully removed the number from array
+ *          false if failed
+ * */
 bool rmv_from_arr(int num){
     int status;
     for (int i = 0; i < SIZE_ARR; ++i) {
@@ -196,16 +224,17 @@ bool rmv_from_arr(int num){
         if (status!=0){
             fputs("Error with acquire read_lock in rmv_from_arr()",stderr);
             pthread_exit(NULL);
-        }        if (global_arr[i] == num){
-            pthread_rwlock_unlock(&lock);
+        }
+        if (global_arr[i] == num){       //Found instance of num in array
+            pthread_rwlock_unlock(&lock);   //release rdlock
             /*Critical Section ends*/
 
-            pthread_rwlock_wrlock(&lock);
+            pthread_rwlock_wrlock(&lock);   //get wrlock
 
             /*Critical Section:*/
-            if (global_arr[i] == num){
-                global_arr[i] = 0;
-                pthread_rwlock_unlock(&lock);
+            if (global_arr[i] == num){      //recheck
+                global_arr[i] = 0;          //zero out the cell
+                pthread_rwlock_unlock(&lock);   //release wrlock
                 /*Critical Section ends*/
 
                 return true;
@@ -223,10 +252,17 @@ bool rmv_from_arr(int num){
     return false; //if unsuccessful
 }
 /*----------------------------------------------------------------------------*/
+/**
+ * Threads type B try to find a random number in the array.
+ * @return pointer to counter containing how many successful attempts where
+ *  made to locate that random number.
+ * */
 void * count_arr (){
     int status;
     srand((unsigned) time(NULL));
     bool found;
+
+    //Allocate memory for counter
     thread_data_t * counter = (thread_data_t*) malloc (sizeof(thread_data_t));
     if (counter == NULL){
         fputs("cannot allocate memory in count_arr()", stderr);
@@ -237,21 +273,22 @@ void * count_arr (){
         found = false;
         int rand_num = rand() % RANGE + 1;
         for (int j = 0; j < SIZE_ARR; ++j) {
-            status = pthread_rwlock_rdlock(&lock);
+            status = pthread_rwlock_rdlock(&lock);      //acquire rdlock
             if (status!=0){
                 fputs("Error with acquire read_lock in count_arr()",stderr);
                 pthread_exit(NULL);
             }
             /*Critical Section:*/
 
-            if (global_arr[j] == rand_num) {
-                found = true;
+            if (global_arr[j] == rand_num) {            //found my random number
+                found = true;                           //mark as found
             }
-            pthread_rwlock_unlock(&lock);
+            // Release the lock after every single arr read
+            pthread_rwlock_unlock(&lock);               //release the rdlock
             /*Critical Section ends*/
 
             if (found) {
-                ++(counter->read);
+                ++(counter->read);                      //count successful attmp
                 break;
             }
         }
