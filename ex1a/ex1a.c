@@ -1,3 +1,12 @@
+/**
+ * Created by @author Omer Schwartz
+ * know.one.omer at gmail d.o.t com
+ *
+ *
+ *
+ * */
+
+/*------------------------- Include Section --------------------------------*/
 #include <pthread.h>
 #include <stdio.h>
 #include <string.h>

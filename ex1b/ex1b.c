@@ -16,14 +16,14 @@
  *
  * */
 
-/*----------------------------------------------------------------------------*/
+/*--------------------------- Include Section --------------------------------*/
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
 #include <math.h>
 #include <unistd.h>
-/*----------------------------------------------------------------------------*/
+/*-------------------------- Define Section ----------------------------------*/
 #define N 10                        //As defined in exercise
 #define THREADS_NUM 6               //Amount of threads, half will be
                                     //producers and half consumers
