@@ -26,12 +26,12 @@ int global_arr[SIZE_ARR];           //Shared array by al threads
 pthread_rwlock_t lock;              //global rw_lock
 /*----------------------------------------------------------------------------*/
 int main() {
-
+    int status;
+    memset(global_arr, 0, SIZE_ARR);                //Zero out the global arr
     pthread_t thread_id[THREADS_NUM];               //required for thread creating
     int thread_arr[THREADS_NUM];                    //needed for thread job assignment
 
     thread_data_t * thread_answer[THREADS_NUM];     //Holds counters ret from thread
-    memset(global_arr, 0, SIZE_ARR);                //Zero out the global arr
     if(pthread_rwlock_init(&lock,NULL) == -1){      //init the lock
         fputs("Cannot create lock in main()", stderr);
         exit(EXIT_FAILURE);
@@ -42,7 +42,7 @@ int main() {
         thread_arr[i] = i;                          //identify each thread
 
         //create threads, send to doWork(), with thread number param
-        int status = pthread_create(&thread_id[i],NULL,(void*)doWork,&thread_arr[i]);
+        status = pthread_create(&thread_id[i],NULL,(void*)doWork,&thread_arr[i]);
         if (status != 0){
             fputs("Can't create pthread in main()", stderr);
             exit(EXIT_FAILURE);
@@ -50,8 +50,13 @@ int main() {
     }
 
     for (int i = 0; i < THREADS_NUM; ++i) {         //Wait for 6 threads, print the output
-        pthread_join(thread_id[i],(void**) &(thread_answer[i]));    //thread_answer[i] is allocated from thread
+        status = pthread_join(thread_id[i],(void**) &(thread_answer[i]));    //thread_answer[i] is allocated from thread
+        if (status!=0){
+            fputs("Error with pthread_join in main()",stderr);
+            exit(EXIT_FAILURE);
+        }
         //Check answer exists
+
         if (thread_answer[i] != NULL) {
             //Print output by thread assignment
             if (thread_arr[i] < THREADS_NUM/2) {
@@ -99,7 +104,6 @@ void * change_arr(){    //Thread A does this
     for (int i = 0; i < ITERATE; ++i) {
         int minus = rand()%2 == 0 ? 1 : -1;
         int rand_num = (rand()%(RANGE+1))*minus;
-//        printf("TEST: rand_num=%d in change_arr()\n",rand_num);
         if (rand_num > 0) {
             if (insert_to_arr(rand_num)){
                 ++(counter->added);
@@ -116,8 +120,13 @@ void * change_arr(){    //Thread A does this
 }
 /*----------------------------------------------------------------------------*/
 bool insert_to_arr(int num){
+    int status;
     for (int i = 0; i < SIZE_ARR; ++i) {
-        pthread_rwlock_rdlock(&lock);
+        status = pthread_rwlock_rdlock(&lock);
+        if (status!=0){
+            fputs("Error with acquire read_lock in insert_to_arr()",stderr);
+            pthread_exit(NULL); //Should try again
+        }
         if (global_arr[i] == 0){
             pthread_rwlock_unlock(&lock);
             pthread_rwlock_wrlock(&lock);
@@ -128,7 +137,7 @@ bool insert_to_arr(int num){
             }
             else{
                 pthread_rwlock_unlock(&lock);
-                i = 0; //Maybe While()? - resets the loop
+                i = 0; //resets the loop
             }
         }
         else{
@@ -139,16 +148,18 @@ bool insert_to_arr(int num){
 }
 /*----------------------------------------------------------------------------*/
 bool rmv_from_arr(int num){
-
+    int status;
     for (int i = 0; i < SIZE_ARR; ++i) {
-        pthread_rwlock_rdlock(&lock);
-        if (global_arr[i] == num){
+        status = pthread_rwlock_rdlock(&lock);
+        if (status!=0){
+            fputs("Error with acquire read_lock in rmv_from_arr()",stderr);
+            pthread_exit(NULL);
+        }        if (global_arr[i] == num){
             pthread_rwlock_unlock(&lock);
             pthread_rwlock_wrlock(&lock);
             if (global_arr[i] == num){
                 global_arr[i] = 0;
                 pthread_rwlock_unlock(&lock);
-//                printf("removed %d from arr[%d]=%d\n", num, i, global_arr[i]);
                 return true;
             }
             else{
@@ -165,23 +176,25 @@ bool rmv_from_arr(int num){
 }
 /*----------------------------------------------------------------------------*/
 void * count_arr (){
-
+    int status;
     srand((unsigned) time(NULL));
     bool found;
     thread_data_t * counter = (thread_data_t*) malloc (sizeof(thread_data_t));
     if (counter == NULL){
-        fputs("cannot allocate memory in change_arr()", stderr);
+        fputs("cannot allocate memory in count_arr()", stderr);
         exit(EXIT_FAILURE); //should be soft exit - with cleanup
     }
 
     for (int i = 0; i < ITERATE; ++i) {
         found = false;
-//        usleep(900);
         int rand_num = rand() % RANGE + 1;
         for (int j = 0; j < SIZE_ARR; ++j) {
-            pthread_rwlock_rdlock(&lock);
+            status = pthread_rwlock_rdlock(&lock);
+            if (status!=0){
+                fputs("Error with acquire read_lock in count_arr()",stderr);
+                pthread_exit(NULL);
+            }
             if (global_arr[j] == rand_num) {
-//                printf("Found=%d in array[%d]=%d\n", rand_num, j, global_arr[j]);
                 found = true;
             }
             pthread_rwlock_unlock(&lock);
