@@ -2,7 +2,6 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
-#include <unistd.h>
 #include <stdbool.h>
 
 #define SIZE_ARR 100
@@ -11,8 +10,8 @@
 #define RANGE 10
 
 typedef struct {
-    int add;
-    int remove;
+    int added;
+    int removed;
     int read;
 }thread_data_t;
 
@@ -28,37 +27,41 @@ pthread_rwlock_t lock;
 /*----------------------------------------------------------------------------*/
 int main() {
 
-    thread_data_t * thread_answer[THREADS_NUM];
-    memset(global_arr, 0, SIZE_ARR);
-    if(pthread_rwlock_init(&lock,NULL) == -1){
-        perror("Cannot create lock in main()");
+    pthread_t thread_id[THREADS_NUM];               //required for thread creating
+    int thread_arr[THREADS_NUM];                    //needed for thread job assignment
+
+    thread_data_t * thread_answer[THREADS_NUM];     //Holds counters ret from thread
+    memset(global_arr, 0, SIZE_ARR);                //Zero out the global arr
+    if(pthread_rwlock_init(&lock,NULL) == -1){      //init the lock
+        fputs("Cannot create lock in main()", stderr);
         exit(EXIT_FAILURE);
     }
 
-    pthread_t thread_id[THREADS_NUM];
-    int thread_arr[THREADS_NUM];
 
-    for (int i = 0; i < THREADS_NUM; ++i) {
-        thread_arr[i] = i;
+    for (int i = 0; i < THREADS_NUM; ++i) {         //create threads
+        thread_arr[i] = i;                          //identify each thread
+
+        //create threads, send to doWork(), with thread number param
         int status = pthread_create(&thread_id[i],NULL,(void*)doWork,&thread_arr[i]);
         if (status != 0){
             fputs("Can't create pthread in main()", stderr);
             exit(EXIT_FAILURE);
         }
     }
-    if (thread_answer == NULL){
-        perror("Allocating memory failed. main()");
-        exit(EXIT_FAILURE);
-    }
+
 
     for (int i = 0; i < THREADS_NUM; ++i) {
         pthread_join(thread_id[i],(void**) &(thread_answer[i]));
         //Here be thread answer int
         if (thread_answer[i] != NULL) {
-            if (thread_arr[i] < THREADS_NUM/2)
-                printf("thread %d added %d numbers and removed %d numbers\n", i + 1, thread_answer[i]->add, thread_answer[i]->remove);
-            else
-                printf("thread %d found %d of it's numbers in the array\n", i+1, thread_answer[i]->read);
+            if (thread_arr[i] < THREADS_NUM/2) {
+                printf("thread %d with id=(%ld) added %d numbers and removed %d numbers\n", i + 1, thread_id[i],
+                       thread_answer[i]->added, thread_answer[i]->removed);
+            }
+            else{
+                printf("thread %d with id=(%ld) found %d of its numbers in the array\n", i+1,thread_id[i],
+                       thread_answer[i]->read);
+            }
         }
     }
     for (int j = 0; j < THREADS_NUM; ++j) {
@@ -89,7 +92,7 @@ void * change_arr(){    //Thread A does this
     srand((unsigned int)time(NULL));
     thread_data_t * counter = (thread_data_t*) malloc (sizeof(thread_data_t));
     if (counter == NULL){
-        perror("cannot allocate memory in change_arr()");
+        fputs("cannot allocate memory in change_arr()", stderr);
         exit(EXIT_FAILURE); //should be soft exit - with cleanup
     }
     for (int i = 0; i < ITERATE; ++i) {
@@ -98,12 +101,12 @@ void * change_arr(){    //Thread A does this
 //        printf("TEST: rand_num=%d in change_arr()\n",rand_num);
         if (rand_num > 0) {
             if (insert_to_arr(rand_num)){
-                ++(counter->add);
+                ++(counter->added);
             }
         }
         else if (rand_num < 0){
             if (rmv_from_arr(-rand_num)){
-                ++(counter->remove);
+                ++(counter->removed);
             }
 
         }
@@ -166,7 +169,7 @@ void * count_arr (){
     bool found;
     thread_data_t * counter = (thread_data_t*) malloc (sizeof(thread_data_t));
     if (counter == NULL){
-        perror("cannot allocate memory in change_arr()");
+        fputs("cannot allocate memory in change_arr()", stderr);
         exit(EXIT_FAILURE); //should be soft exit - with cleanup
     }
 
