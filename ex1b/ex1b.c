@@ -26,20 +26,20 @@
 /*-------------------------- Define Section ----------------------------------*/
 #define N 10                        //As defined in exercise
 #define THREADS_NUM 6               //Amount of threads, half will be
-//producers and half consumers
+                                    //producers and half consumers
 #define ITERATE 100                 //Thread's loop iteration
 #define RANGE 100                   //Range of prime numbers
 #define STOP_VALUE -1               //Cleanup threads stop marker for counter
 
 #define SLEEP usleep((unsigned)rand()%SLEEP_DELAY);
 #define SLEEP_DELAY 200000          //Used to generate different prime numbers
-//(in milliseconds)
-//The bigger the number, the slower the program
-//Recommended value - 200000
-//(minimum 1 - no sleep)
+                                    //(in milliseconds)
+                                    //The bigger the number, the slower the program
+                                    //Recommended value - 200000
+                                    //(minimum 1 - no sleep)
 
 /*#define DEBUG                     //Uncomment this to see verbose(extended)
-                                    //data aboutthe program running and
+                                    //data about the program running and
                                     //threads work*/
 /*------------------------ Type Definition -----------------------------------*/
 
